@@ -1,0 +1,62 @@
+# ============================================================
+#  РЕЖИМ БЕЗ TLS (сертификаты Let's Encrypt ещё не выпущены).
+#  Файл генерируется автоматически скриптом
+#  /docker-entrypoint.d/25-render-confs.sh
+#  Вручную не редактировать — правьте .env и шаблоны.
+# ============================================================
+
+server {
+    listen      80;
+    listen      [::]:80;
+    server_name ${N8N_DOMAIN};
+
+    server_tokens          ${NGINX_SERVER_TOKENS};
+    client_max_body_size   ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    # Служебный эндпоинт для healthcheck контейнера nginx
+    location = /nginx-health {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Проверка домена для ACME (используется при выпуске сертификата)
+    location ^~ /.well-known/acme-challenge/ {
+        root         ${NGINX_ACME_WEBROOT};
+        default_type "text/plain";
+        allow        all;
+    }
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $n8n_upstream http://n8n:${N8N_PORT};
+
+    location / {
+        proxy_pass $n8n_upstream;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+}
+
+server {
+    listen      80;
+    listen      [::]:80;
+    server_name ${QDRANT_DOMAIN};
+
+    server_tokens          ${NGINX_SERVER_TOKENS};
+    client_max_body_size   ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root         ${NGINX_ACME_WEBROOT};
+        default_type "text/plain";
+        allow        all;
+    }
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $qdrant_upstream http://qdrant:${QDRANT_HTTP_PORT};
+
+    # Basic-auth подключается только если существует файл nginx/htpasswd/.htpasswd
+    include /etc/nginx/conf.d-optional/*.conf;
+
+    location / {
+        proxy_pass $qdrant_upstream;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+}

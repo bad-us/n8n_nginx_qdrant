@@ -1,0 +1,29 @@
+# ============================================================
+#  HTTP :80 -> HTTPS :443 (когда сертификаты уже есть).
+#  Путь /.well-known/acme-challenge/ остаётся на HTTP для продления.
+#  Генерируется автоматически скриптом 25-render-confs.sh
+# ============================================================
+
+server {
+    listen      80;
+    listen      [::]:80;
+    server_name ${N8N_DOMAIN} ${QDRANT_DOMAIN};
+
+    server_tokens ${NGINX_SERVER_TOKENS};
+
+    # Служебный эндпоинт для healthcheck контейнера nginx
+    location = /nginx-health {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location ^~ /.well-known/acme-challenge/ {
+        root         ${NGINX_ACME_WEBROOT};
+        default_type "text/plain";
+        allow        all;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

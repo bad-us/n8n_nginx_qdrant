@@ -1,0 +1,81 @@
+# ============================================================
+#  HTTPS :443 — n8n и Qdrant.
+#  Генерируется автоматически скриптом 25-render-confs.sh
+#  Пути к сертификатам берутся из TLS_CERT_NAME (.env)
+# ============================================================
+
+# ---------- n8n ----------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name ${N8N_DOMAIN};
+
+    ssl_certificate         /etc/letsencrypt/live/${TLS_CERT_NAME}/fullchain.pem;
+    ssl_certificate_key     /etc/letsencrypt/live/${TLS_CERT_NAME}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${TLS_CERT_NAME}/chain.pem;
+
+    ssl_protocols             ${NGINX_TLS_PROTOCOLS};
+    ssl_ciphers               ${NGINX_TLS_CIPHERS};
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache         shared:SSL:10m;
+    ssl_session_timeout       1d;
+    ssl_session_tickets       off;
+    ssl_stapling              on;
+    ssl_stapling_verify       on;
+
+    server_tokens        ${NGINX_SERVER_TOKENS};
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    add_header Strict-Transport-Security "max-age=${NGINX_HSTS_MAX_AGE}; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "SAMEORIGIN" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $n8n_upstream http://n8n:${N8N_PORT};
+
+    location / {
+        proxy_pass $n8n_upstream;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+}
+
+# ---------- Qdrant ----------
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+    server_name ${QDRANT_DOMAIN};
+
+    ssl_certificate         /etc/letsencrypt/live/${TLS_CERT_NAME}/fullchain.pem;
+    ssl_certificate_key     /etc/letsencrypt/live/${TLS_CERT_NAME}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${TLS_CERT_NAME}/chain.pem;
+
+    ssl_protocols             ${NGINX_TLS_PROTOCOLS};
+    ssl_ciphers               ${NGINX_TLS_CIPHERS};
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache         shared:SSL:10m;
+    ssl_session_timeout       1d;
+    ssl_session_tickets       off;
+    ssl_stapling              on;
+    ssl_stapling_verify       on;
+
+    server_tokens        ${NGINX_SERVER_TOKENS};
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+
+    add_header Strict-Transport-Security "max-age=${NGINX_HSTS_MAX_AGE}; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $qdrant_upstream http://qdrant:${QDRANT_HTTP_PORT};
+
+    # Basic-auth подключается только если существует файл nginx/htpasswd/.htpasswd
+    include /etc/nginx/conf.d-optional/*.conf;
+
+    location / {
+        proxy_pass $qdrant_upstream;
+        include /etc/nginx/snippets/proxy-params.conf;
+    }
+}
